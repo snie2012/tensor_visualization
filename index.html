@@ -75,6 +75,34 @@
     .sample-btn:hover { background: #1a4a8a; }
     .sample-btn.active { background: var(--accent); border-color: var(--accent); }
 
+    .shape-separator {
+      color: var(--border);
+      font-size: 14px;
+      margin: 0 2px;
+    }
+
+    .shape-input-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .shape-input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 12px;
+      width: 120px;
+    }
+
+    .shape-input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
     .shape-display {
       margin-left: auto;
       font-size: 13px;
@@ -378,6 +406,10 @@
       <button class="sample-btn" onclick="loadSample('4d')">4D [2x2x3x3]</button>
       <button class="sample-btn" onclick="loadSample('5d')">5D [2x2x2x2x3]</button>
       <button class="sample-btn" onclick="openCustomModal()">Custom...</button>
+      <span class="shape-separator">|</span>
+      <label class="shape-input-label" for="shapeInput">Shape:</label>
+      <input type="text" id="shapeInput" class="shape-input" placeholder="e.g. 2,3,4" spellcheck="false">
+      <button class="sample-btn" id="randomBtn" onclick="loadRandomFromShape()">Random</button>
       <span class="shape-display" id="shapeDisplay"></span>
     </div>
   </header>
@@ -512,6 +544,51 @@
         }
       }
       return result;
+    }
+
+    function generateRandomTensor(shape) {
+      if (shape.length === 0) {
+        return parseFloat((Math.random() * 20 - 10).toFixed(2));
+      }
+      const [first, ...rest] = shape;
+      const result = [];
+      for (let i = 0; i < first; i++) {
+        result.push(generateRandomTensor(rest));
+      }
+      return result;
+    }
+
+    const MAX_RANDOM_ELEMENTS = 100000;
+
+    function parseShapeInput(input) {
+      const cleaned = input.trim().replace(/[\[\]()]/g, '');
+      if (!cleaned) throw new Error('Empty shape');
+      const dims = cleaned.split(/[,x\s]+/).map(s => {
+        const n = parseInt(s.trim(), 10);
+        if (isNaN(n) || n <= 0) throw new Error(`Invalid dimension: "${s.trim()}"`);
+        return n;
+      });
+      if (dims.length === 0) throw new Error('No dimensions specified');
+      const total = dims.reduce((a, b) => a * b, 1);
+      if (total > MAX_RANDOM_ELEMENTS) {
+        throw new Error(
+          `Too many elements (${total.toLocaleString()}). Max is ${MAX_RANDOM_ELEMENTS.toLocaleString()}.`
+        );
+      }
+      return dims;
+    }
+
+    function loadRandomFromShape() {
+      const input = document.getElementById('shapeInput').value;
+      try {
+        const shape = parseShapeInput(input);
+        const data = generateRandomTensor(shape);
+        document.querySelectorAll('.sample-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('randomBtn').classList.add('active');
+        visualize(data);
+      } catch (e) {
+        alert('Invalid shape: ' + e.message);
+      }
     }
 
     const SAMPLES = {
@@ -867,9 +944,16 @@
       }
     }
 
-    // ── Keyboard shortcut ──
+    // ── Keyboard shortcuts ──
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') closeCustomModal();
+    });
+
+    document.getElementById('shapeInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        loadRandomFromShape();
+      }
     });
 
     // ── Init ──
