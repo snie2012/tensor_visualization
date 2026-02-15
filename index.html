@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tensor Visualization</title>
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --surface: #16213e;
+      --border: #0f3460;
+      --text: #e0e0e0;
+      --text-muted: #8892a4;
+      --accent: #e94560;
+      --dim-0: #e94560;
+      --dim-1: #f5a623;
+      --dim-2: #7ed321;
+      --dim-3: #4a90d9;
+      --dim-4: #bd10e0;
+      --dim-5: #50e3c2;
+      --dim-6: #f8e71c;
+      --dim-7: #ff6b6b;
+      --leaf: #4fc3f7;
+      --toggle-size: 20px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      flex: 1;
+    }
+
+    .sample-btn {
+      background: var(--border);
+      color: var(--text);
+      border: 1px solid #1a4a8a;
+      padding: 6px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+      transition: background 0.15s;
+    }
+
+    .sample-btn:hover { background: #1a4a8a; }
+    .sample-btn.active { background: var(--accent); border-color: var(--accent); }
+
+    .shape-display {
+      margin-left: auto;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .shape-display strong { color: var(--text); }
+
+    .toolbar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar label {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .toolbar input[type="text"] {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 13px;
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .toolbar input[type="text"]:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .toolbar button {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 6px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      transition: opacity 0.15s;
+    }
+
+    .toolbar button:hover { opacity: 0.85; }
+
+    .action-btn {
+      background: var(--border);
+      color: var(--text);
+      border: 1px solid #1a4a8a;
+      padding: 6px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+      transition: background 0.15s;
+    }
+
+    .action-btn:hover { background: #1a4a8a; }
+
+    .main-content {
+      flex: 1;
+      overflow: auto;
+      padding: 20px 24px;
+    }
+
+    .tree-container {
+      user-select: none;
+    }
+
+    /* Tree node */
+    .tree-node {
+      position: relative;
+    }
+
+    .tree-node-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 0;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: background 0.1s;
+    }
+
+    .tree-node-row:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .tree-node-children {
+      margin-left: 24px;
+      border-left: 1px solid rgba(255, 255, 255, 0.06);
+      padding-left: 8px;
+      overflow: hidden;
+    }
+
+    .tree-node-children.collapsed {
+      display: none;
+    }
+
+    /* Toggle icon */
+    .toggle {
+      width: var(--toggle-size);
+      height: var(--toggle-size);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 11px;
+      color: var(--text-muted);
+      transition: transform 0.15s;
+    }
+
+    .toggle.expanded {
+      transform: rotate(90deg);
+    }
+
+    .toggle.leaf {
+      visibility: hidden;
+    }
+
+    /* Dimension badge */
+    .dim-badge {
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-weight: 600;
+      flex-shrink: 0;
+      opacity: 0.9;
+    }
+
+    /* Index label */
+    .index-label {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    /* Tensor value */
+    .tensor-value {
+      font-size: 13px;
+      color: var(--leaf);
+      font-weight: 500;
+    }
+
+    /* Summary (collapsed preview) */
+    .summary {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-left: 4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 500px;
+    }
+
+    /* Size count */
+    .size-count {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-left: 4px;
+    }
+
+    /* Legend */
+    .legend {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .legend-swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+    }
+
+    /* Info bar */
+    .info-bar {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 8px 24px;
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    /* Custom tensor modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.visible { display: flex; }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      width: 90%;
+      max-width: 600px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .modal h2 {
+      font-size: 16px;
+      margin-bottom: 12px;
+      color: var(--accent);
+    }
+
+    .modal p {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+
+    .modal textarea {
+      width: 100%;
+      min-height: 150px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 13px;
+      resize: vertical;
+    }
+
+    .modal textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+      justify-content: flex-end;
+    }
+
+    .modal-actions button {
+      padding: 8px 20px;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-secondary { background: var(--border); color: var(--text); }
+
+    .error-msg {
+      color: #ff6b6b;
+      font-size: 12px;
+      margin-top: 8px;
+      display: none;
+    }
+
+    .error-msg.visible { display: block; }
+
+    /* Heatmap coloring for values */
+    .val-negative { color: #64b5f6; }
+    .val-zero { color: #90a4ae; }
+    .val-positive { color: #ef5350; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Tensor Visualizer</h1>
+    <div class="header-controls">
+      <button class="sample-btn active" onclick="loadSample('2d')">2D [3x4]</button>
+      <button class="sample-btn" onclick="loadSample('3d')">3D [2x3x4]</button>
+      <button class="sample-btn" onclick="loadSample('4d')">4D [2x2x3x3]</button>
+      <button class="sample-btn" onclick="loadSample('5d')">5D [2x2x2x2x3]</button>
+      <button class="sample-btn" onclick="openCustomModal()">Custom...</button>
+      <span class="shape-display" id="shapeDisplay"></span>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <div class="legend" id="legend"></div>
+    <div style="margin-left: auto; display: flex; gap: 8px;">
+      <button class="action-btn" onclick="expandAll()">Expand All</button>
+      <button class="action-btn" onclick="collapseAll()">Collapse All</button>
+      <button class="action-btn" onclick="expandToDepth(1)">Depth 1</button>
+      <button class="action-btn" onclick="expandToDepth(2)">Depth 2</button>
+    </div>
+  </div>
+
+  <div class="main-content">
+    <div class="tree-container" id="treeContainer"></div>
+  </div>
+
+  <div class="info-bar" id="infoBar"></div>
+
+  <!-- Custom tensor modal -->
+  <div class="modal-overlay" id="customModal">
+    <div class="modal">
+      <h2>Custom Tensor</h2>
+      <p>Enter a tensor as a nested JSON array. Examples:</p>
+      <p style="font-size: 12px; color: var(--text);">
+        1D: <code>[1, 2, 3]</code><br>
+        2D: <code>[[1, 2], [3, 4]]</code><br>
+        3D: <code>[[[1, 2], [3, 4]], [[5, 6], [7, 8]]]</code>
+      </p>
+      <textarea id="customInput" spellcheck="false" placeholder="[[1, 2, 3], [4, 5, 6]]"></textarea>
+      <div class="error-msg" id="customError"></div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeCustomModal()">Cancel</button>
+        <button class="btn-primary" onclick="loadCustomTensor()">Visualize</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── Dimension colors ──
+    const DIM_COLORS = [
+      '#e94560', '#f5a623', '#7ed321', '#4a90d9',
+      '#bd10e0', '#50e3c2', '#f8e71c', '#ff6b6b',
+    ];
+
+    function dimColor(depth) {
+      return DIM_COLORS[depth % DIM_COLORS.length];
+    }
+
+    // ── Tensor utilities ──
+
+    function inferShape(data) {
+      const shape = [];
+      let current = data;
+      while (Array.isArray(current)) {
+        shape.push(current.length);
+        current = current[0];
+      }
+      return shape;
+    }
+
+    function validateTensor(data, shape, depth) {
+      if (depth === shape.length) {
+        if (Array.isArray(data)) {
+          throw new Error(`Expected scalar at depth ${depth}, got array`);
+        }
+        if (typeof data !== 'number') {
+          throw new Error(`Expected number, got ${typeof data}: ${data}`);
+        }
+        return;
+      }
+      if (!Array.isArray(data)) {
+        throw new Error(`Expected array at depth ${depth}, got ${typeof data}`);
+      }
+      if (data.length !== shape[depth]) {
+        throw new Error(
+          `Ragged tensor: expected size ${shape[depth]} at dim ${depth}, got ${data.length}`
+        );
+      }
+      for (let i = 0; i < data.length; i++) {
+        validateTensor(data[i], shape, depth + 1);
+      }
+    }
+
+    function totalElements(shape) {
+      return shape.reduce((a, b) => a * b, 1);
+    }
+
+    function flatValues(data) {
+      if (!Array.isArray(data)) return [data];
+      return data.flatMap(flatValues);
+    }
+
+    function tensorStats(data) {
+      const vals = flatValues(data);
+      const min = Math.min(...vals);
+      const max = Math.max(...vals);
+      const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+      return { min, max, mean, count: vals.length };
+    }
+
+    function formatNum(n) {
+      if (Number.isInteger(n)) return n.toString();
+      return n.toFixed(4).replace(/0+$/, '').replace(/\.$/, '');
+    }
+
+    function summaryText(data, maxItems) {
+      if (!Array.isArray(data)) return formatNum(data);
+      maxItems = maxItems || 6;
+      const parts = data.slice(0, maxItems).map(d => {
+        if (!Array.isArray(d)) return formatNum(d);
+        return '[' + summaryText(d, 3) + ']';
+      });
+      if (data.length > maxItems) parts.push('...');
+      return parts.join(', ');
+    }
+
+    // ── Sample tensors ──
+
+    function generateTensor(shape, offset) {
+      offset = offset || 0;
+      if (shape.length === 0) return offset;
+      const [first, ...rest] = shape;
+      const result = [];
+      const stride = totalElements(rest.length ? rest : [1]);
+      for (let i = 0; i < first; i++) {
+        if (rest.length === 0) {
+          result.push(parseFloat((Math.sin(offset + i) * 10).toFixed(2)));
+        } else {
+          result.push(generateTensor(rest, offset + i * stride));
+        }
+      }
+      return result;
+    }
+
+    const SAMPLES = {
+      '2d': () => generateTensor([3, 4]),
+      '3d': () => generateTensor([2, 3, 4]),
+      '4d': () => generateTensor([2, 2, 3, 3]),
+      '5d': () => generateTensor([2, 2, 2, 2, 3]),
+    };
+
+    // ── State ──
+    let currentTensor = null;
+    let currentShape = null;
+    let currentStats = null;
+    let expandedNodes = new Set();
+    let nodeIdCounter = 0;
+
+    // ── Tree rendering (lazy on-demand) ──
+
+    function createNodeId() {
+      return 'n' + (nodeIdCounter++);
+    }
+
+    function buildTreeNode(data, depth, index, parentPath) {
+      const nodeId = createNodeId();
+      const path = parentPath ? parentPath + '.' + index : '' + index;
+      const isLeaf = !Array.isArray(data);
+      const el = document.createElement('div');
+      el.className = 'tree-node';
+      el.dataset.nodeId = nodeId;
+      el.dataset.path = path;
+      el.dataset.depth = depth;
+
+      // Row
+      const row = document.createElement('div');
+      row.className = 'tree-node-row';
+
+      // Toggle arrow
+      const toggle = document.createElement('span');
+      toggle.className = 'toggle' + (isLeaf ? ' leaf' : '');
+      toggle.textContent = '▶';
+      row.appendChild(toggle);
+
+      // Dimension badge
+      const badge = document.createElement('span');
+      badge.className = 'dim-badge';
+      const color = isLeaf ? '#4fc3f7' : dimColor(depth);
+      badge.style.background = color + '22';
+      badge.style.color = color;
+      if (isLeaf) {
+        badge.textContent = 'val';
+      } else {
+        badge.textContent = 'dim ' + depth;
+      }
+      row.appendChild(badge);
+
+      // Index label
+      const label = document.createElement('span');
+      label.className = 'index-label';
+      label.style.color = color;
+      label.textContent = '[' + index + ']';
+      row.appendChild(label);
+
+      if (isLeaf) {
+        // Show the value
+        const valSpan = document.createElement('span');
+        valSpan.className = 'tensor-value';
+        valSpan.textContent = ' = ' + formatNum(data);
+        // Color by sign
+        if (data < 0) valSpan.classList.add('val-negative');
+        else if (data === 0) valSpan.classList.add('val-zero');
+        else valSpan.classList.add('val-positive');
+        row.appendChild(valSpan);
+      } else {
+        // Size count
+        const sizeSpan = document.createElement('span');
+        sizeSpan.className = 'size-count';
+        sizeSpan.textContent = '(' + data.length + ')';
+        row.appendChild(sizeSpan);
+
+        // Summary text
+        const summarySpan = document.createElement('span');
+        summarySpan.className = 'summary';
+        summarySpan.textContent = '[' + summaryText(data, 5) + ']';
+        row.appendChild(summarySpan);
+      }
+
+      el.appendChild(row);
+
+      // Children container (lazy)
+      if (!isLeaf) {
+        const childrenEl = document.createElement('div');
+        childrenEl.className = 'tree-node-children collapsed';
+        childrenEl.dataset.loaded = 'false';
+        el.appendChild(childrenEl);
+
+        // Store data reference for lazy loading
+        el._tensorData = data;
+        el._depth = depth;
+        el._path = path;
+
+        // Click handler
+        row.addEventListener('click', () => {
+          toggleNode(el);
+        });
+      }
+
+      return el;
+    }
+
+    function toggleNode(nodeEl) {
+      const childrenEl = nodeEl.querySelector(':scope > .tree-node-children');
+      if (!childrenEl) return;
+
+      const isCollapsed = childrenEl.classList.contains('collapsed');
+
+      if (isCollapsed) {
+        // Expand: lazy-load children if needed
+        if (childrenEl.dataset.loaded === 'false') {
+          loadChildren(nodeEl, childrenEl);
+          childrenEl.dataset.loaded = 'true';
+        }
+        childrenEl.classList.remove('collapsed');
+        nodeEl.querySelector(':scope > .tree-node-row .toggle').classList.add('expanded');
+        expandedNodes.add(nodeEl.dataset.path || nodeEl.dataset.nodeId);
+      } else {
+        // Collapse
+        childrenEl.classList.add('collapsed');
+        nodeEl.querySelector(':scope > .tree-node-row .toggle').classList.remove('expanded');
+        expandedNodes.delete(nodeEl.dataset.path || nodeEl.dataset.nodeId);
+      }
+    }
+
+    function loadChildren(nodeEl, childrenEl) {
+      const data = nodeEl._tensorData;
+      const depth = nodeEl._depth;
+      const path = nodeEl._path;
+
+      const fragment = document.createDocumentFragment();
+      for (let i = 0; i < data.length; i++) {
+        fragment.appendChild(buildTreeNode(data[i], depth + 1, i, path));
+      }
+      childrenEl.appendChild(fragment);
+    }
+
+    function expandNodeEl(nodeEl) {
+      const childrenEl = nodeEl.querySelector(':scope > .tree-node-children');
+      if (!childrenEl) return;
+      if (childrenEl.classList.contains('collapsed')) {
+        if (childrenEl.dataset.loaded === 'false') {
+          loadChildren(nodeEl, childrenEl);
+          childrenEl.dataset.loaded = 'true';
+        }
+        childrenEl.classList.remove('collapsed');
+        nodeEl.querySelector(':scope > .tree-node-row .toggle').classList.add('expanded');
+      }
+    }
+
+    function collapseNodeEl(nodeEl) {
+      const childrenEl = nodeEl.querySelector(':scope > .tree-node-children');
+      if (!childrenEl) return;
+      if (!childrenEl.classList.contains('collapsed')) {
+        childrenEl.classList.add('collapsed');
+        nodeEl.querySelector(':scope > .tree-node-row .toggle').classList.remove('expanded');
+      }
+    }
+
+    // ── Tree-wide operations ──
+
+    function expandAll() {
+      const allNodes = document.querySelectorAll('.tree-node');
+      allNodes.forEach(expandNodeEl);
+    }
+
+    function collapseAll() {
+      expandedNodes.clear();
+      const allNodes = document.querySelectorAll('.tree-node');
+      allNodes.forEach(collapseNodeEl);
+    }
+
+    function expandToDepth(maxDepth) {
+      collapseAll();
+      const allNodes = document.querySelectorAll('.tree-node');
+      allNodes.forEach(nodeEl => {
+        const d = parseInt(nodeEl.dataset.depth, 10);
+        if (d < maxDepth) {
+          expandNodeEl(nodeEl);
+        }
+      });
+    }
+
+    // ── Root rendering ──
+
+    function buildRootNode(data, shape) {
+      const nodeId = createNodeId();
+      const el = document.createElement('div');
+      el.className = 'tree-node';
+      el.dataset.nodeId = nodeId;
+      el.dataset.path = 'root';
+      el.dataset.depth = '0';
+
+      const row = document.createElement('div');
+      row.className = 'tree-node-row';
+
+      const toggle = document.createElement('span');
+      toggle.className = 'toggle';
+      toggle.textContent = '▶';
+      row.appendChild(toggle);
+
+      const badge = document.createElement('span');
+      badge.className = 'dim-badge';
+      badge.style.background = '#e9456022';
+      badge.style.color = '#e94560';
+      badge.textContent = 'tensor';
+      row.appendChild(badge);
+
+      const label = document.createElement('span');
+      label.className = 'index-label';
+      label.style.color = '#e94560';
+      label.textContent = 'shape=[' + shape.join(', ') + ']';
+      row.appendChild(label);
+
+      const sizeSpan = document.createElement('span');
+      sizeSpan.className = 'size-count';
+      sizeSpan.textContent = '(' + totalElements(shape) + ' elements)';
+      row.appendChild(sizeSpan);
+
+      el.appendChild(row);
+
+      const childrenEl = document.createElement('div');
+      childrenEl.className = 'tree-node-children collapsed';
+      childrenEl.dataset.loaded = 'false';
+      el.appendChild(childrenEl);
+
+      el._tensorData = data;
+      el._depth = 0;
+      el._path = 'root';
+
+      row.addEventListener('click', () => {
+        toggleNode(el);
+      });
+
+      return el;
+    }
+
+    // ── Main visualize function ──
+
+    function visualize(data) {
+      const shape = inferShape(data);
+      validateTensor(data, shape, 0);
+
+      currentTensor = data;
+      currentShape = shape;
+      currentStats = tensorStats(data);
+      expandedNodes.clear();
+      nodeIdCounter = 0;
+
+      // Update shape display
+      document.getElementById('shapeDisplay').innerHTML =
+        'Shape: <strong>[' + shape.join(', ') + ']</strong> &nbsp; ' +
+        'Elements: <strong>' + currentStats.count + '</strong>';
+
+      // Update legend
+      updateLegend(shape);
+
+      // Update info bar
+      document.getElementById('infoBar').innerHTML =
+        '<span>min: ' + formatNum(currentStats.min) + '</span>' +
+        '<span>max: ' + formatNum(currentStats.max) + '</span>' +
+        '<span>mean: ' + formatNum(currentStats.mean) + '</span>' +
+        '<span>dims: ' + shape.length + '</span>' +
+        '<span style="margin-left: auto; color: #555;">Click nodes to expand/collapse</span>';
+
+      // Build tree
+      const container = document.getElementById('treeContainer');
+      container.innerHTML = '';
+
+      const root = buildRootNode(data, shape);
+      container.appendChild(root);
+
+      // Auto-expand root
+      toggleNode(root);
+
+      // If small tensor, expand first level
+      if (totalElements(shape) <= 100) {
+        const firstLevelNodes = container.querySelectorAll(
+          '.tree-node[data-depth="1"]'
+        );
+        if (firstLevelNodes.length <= 10 && shape.length <= 3) {
+          firstLevelNodes.forEach(expandNodeEl);
+        }
+      }
+    }
+
+    function updateLegend(shape) {
+      const legend = document.getElementById('legend');
+      legend.innerHTML = '';
+      for (let i = 0; i < shape.length; i++) {
+        const item = document.createElement('span');
+        item.className = 'legend-item';
+        const swatch = document.createElement('span');
+        swatch.className = 'legend-swatch';
+        swatch.style.background = dimColor(i);
+        item.appendChild(swatch);
+        const text = document.createTextNode('dim ' + i + ' (size ' + shape[i] + ')');
+        item.appendChild(text);
+        legend.appendChild(item);
+      }
+      // Leaf entry
+      const leafItem = document.createElement('span');
+      leafItem.className = 'legend-item';
+      const leafSwatch = document.createElement('span');
+      leafSwatch.className = 'legend-swatch';
+      leafSwatch.style.background = '#4fc3f7';
+      leafItem.appendChild(leafSwatch);
+      leafItem.appendChild(document.createTextNode('values'));
+      legend.appendChild(leafItem);
+    }
+
+    // ── Sample loading ──
+
+    function loadSample(name) {
+      document.querySelectorAll('.sample-btn').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+      const data = SAMPLES[name]();
+      visualize(data);
+    }
+
+    // ── Custom tensor modal ──
+
+    function openCustomModal() {
+      document.getElementById('customModal').classList.add('visible');
+      document.getElementById('customInput').focus();
+    }
+
+    function closeCustomModal() {
+      document.getElementById('customModal').classList.remove('visible');
+      document.getElementById('customError').classList.remove('visible');
+    }
+
+    function loadCustomTensor() {
+      const input = document.getElementById('customInput').value.trim();
+      const errorEl = document.getElementById('customError');
+      try {
+        const data = JSON.parse(input);
+        const shape = inferShape(data);
+        validateTensor(data, shape, 0);
+        closeCustomModal();
+        document.querySelectorAll('.sample-btn').forEach(b => b.classList.remove('active'));
+        visualize(data);
+      } catch (e) {
+        errorEl.textContent = 'Error: ' + e.message;
+        errorEl.classList.add('visible');
+      }
+    }
+
+    // ── Keyboard shortcut ──
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeCustomModal();
+    });
+
+    // ── Init ──
+    visualize(SAMPLES['2d']());
+  </script>
+</body>
+</html>
